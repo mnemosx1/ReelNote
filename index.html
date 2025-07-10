@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ReelNote 🎬</title>
+  <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, doc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDn1Csd9k-dxvDyopjgz9BZCSY6XhXzwzw",
+      authDomain: "reelnote-12cf3.firebaseapp.com",
+      projectId: "reelnote-12cf3",
+      storageBucket: "reelnote-12cf3.firebasestorage.app",
+      messagingSenderId: "1037592914753",
+      appId: "1:1037592914753:web:fac2d7b51574d6ef9b0fc0",
+      measurementId: "G-Y1Q29JSLP3"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.sendMessage = async () => {
+      const recipient = document.getElementById("recipient").value.trim();
+      const nickname = document.getElementById("nickname").value.trim() || "Anonymous";
+      const message = document.getElementById("message").value.trim();
+      const movieTitle = document.getElementById("movieTitle").value.trim();
+      const moviePoster = document.getElementById("moviePoster").src;
+
+      if (!recipient || !message || !movieTitle || !moviePoster) {
+        alert("Please complete all fields.");
+        return;
+      }
+
+      await addDoc(collection(db, "reels"), {
+        recipient,
+        sender: nickname,
+        message,
+        movieTitle,
+        moviePoster,
+        createdAt: new Date(),
+        reactions: { "😍": 0, "🥹": 0, "😭": 0, "💀": 0 }
+      });
+
+      alert("Your reel has been sent!");
+      document.getElementById("message").value = "";
+      loadMessages();
+    };
+
+    window.react = async (id, emoji) => {
+      const ref = doc(db, "reels", id);
+      await updateDoc(ref, {
+        [`reactions.${emoji}`]: increment(1)
+      });
+      loadMessages();
+    };
+
+    window.loadMessages = async () => {
+      const q = query(collection(db, "reels"), orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+      const list = document.getElementById("messageList");
+      const search = document.getElementById("searchRecipient").value.toLowerCase();
+      list.innerHTML = "";
+
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.recipient.toLowerCase().includes(search)) {
+          const r = data.reactions || { "😍": 0, "🥹": 0, "😭": 0, "💀": 0 };
+          const el = document.createElement("div");
+          el.className = "message";
+          el.innerHTML = `
+            <img src="${data.moviePoster}" class="poster" />
+            <h3 style="margin: 0.5rem 0 0;">🎬 ${data.movieTitle}</h3>
+            <p><strong>📮 To:</strong> ${data.recipient}</p>
+            <p><strong>✍️ From:</strong> ${data.sender}</p>
+            <p><em>💌 ${data.message}</em></p>
+            <div class="reactions">
+              ${["😍", "🥹", "😭", "💀"].map(emoji => `
+                <button onclick="react('${docSnap.id}', '${emoji}')">${emoji} ${r[emoji] || 0}</button>
+              `).join('')}
+            </div>
+          `;
+          list.appendChild(el);
+        }
+      });
+    };
+
+    window.searchMovie = () => {
+      const title = document.getElementById("movieTitle").value;
+      fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(title)}&apikey=f788362a`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.Response === "True") {
+            document.getElementById("moviePoster").src = data.Poster;
+          } else {
+            alert("Movie not found!");
+          }
+        });
+    };
+
+    window.toggleTheme = () => {
+      document.body.classList.toggle("dark-mode");
+    };
+
+    window.onload = loadMessages;
+  </script>
+
+  <style>
+    :root {
+      --bg-light: #fff5fa;
+      --bg-dark: #1b1b2f;
+      --text-light: #222;
+      --text-dark: #f7f7f7;
+      --accent: #ff9eb3;
+    }
+
+    body {
+      font-family: 'Patrick Hand', cursive;
+      background: var(--bg-light) url('https://www.transparenttextures.com/patterns/hearts.png');
+      background-size: 300px;
+      color: var(--text-light);
+      margin: 0;
+      padding: 0;
+    }
+
+    body.dark-mode {
+      background: var(--bg-dark) url('https://www.transparenttextures.com/patterns/stardust.png');
+      color: var(--text-dark);
+    }
+
+    header {
+      text-align: center;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 3em;
+      text-shadow: 2px 2px #ffc0cb;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    input, textarea, button {
+      width: 100%;
+      padding: 0.8rem;
+      margin-top: 0.8rem;
+      font-family: inherit;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+
+    .poster {
+      width: 100%;
+      border-radius: 10px;
+      margin: 0.5rem 0;
+    }
+
+    #messageList {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .message {
+      background: #fff;
+      padding: 1rem;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+
+    body.dark-mode .message {
+      background: #2b2b45;
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      background: var(--accent);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .reactions button {
+      font-size: 1.1rem;
+      margin-right: 5px;
+      margin-top: 0.5rem;
+      padding: 0.4rem 0.6rem;
+      border-radius: 8px;
+      border: none;
+      background: #ffeef0;
+      cursor: pointer;
+    }
+
+    .search-bar {
+      text-align: center;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="theme-toggle" onclick="toggleTheme()">🌙 Change Theme</div>
+  <header>
+    <h1>ReelNote 🎬</h1>
+    <p class="tagline">this film says everything i couldn’t</p>
+  </header>
+  <div class="container">
+    <input type="text" id="recipient" placeholder="Recipient name" />
+    <input type="text" id="movieTitle" placeholder="Enter movie title" />
+    <button onclick="searchMovie()">Search Movie</button>
+    <img id="moviePoster" class="poster" src="" alt="Movie Poster"/>
+    <textarea id="message" placeholder="Why I want you to watch this movie?"></textarea>
+    <input type="text" id="nickname" placeholder="Your nickname (or leave blank for anonymous)" />
+    <button onclick="sendMessage()">Send Reel 🎬</button>
+
+    <div class="search-bar">
+      <input type="text" id="searchRecipient" placeholder="Search by recipient..." oninput="loadMessages()" />
+    </div>
+
+    <div id="messageList"></div>
+  </div>
+</body>
+</html>
